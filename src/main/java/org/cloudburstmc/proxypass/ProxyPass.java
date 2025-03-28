@@ -34,10 +34,7 @@ import org.cloudburstmc.protocol.bedrock.data.EncodingSettings;
 import org.cloudburstmc.protocol.bedrock.data.definitions.BlockDefinition;
 import org.cloudburstmc.protocol.bedrock.netty.initializer.BedrockChannelInitializer;
 import org.cloudburstmc.protocol.common.DefinitionRegistry;
-import org.cloudburstmc.proxypass.network.bedrock.session.Account;
-import org.cloudburstmc.proxypass.network.bedrock.session.ProxyClientSession;
-import org.cloudburstmc.proxypass.network.bedrock.session.ProxyServerSession;
-import org.cloudburstmc.proxypass.network.bedrock.session.UpstreamPacketHandler;
+import org.cloudburstmc.proxypass.network.bedrock.session.*;
 import org.cloudburstmc.proxypass.network.bedrock.util.NbtBlockDefinitionRegistry;
 import org.cloudburstmc.proxypass.network.bedrock.util.UnknownBlockDefinitionRegistry;
 
@@ -66,8 +63,8 @@ public class ProxyPass {
     public static final String MINECRAFT_VERSION;
     public static final BedrockCodecHelper HELPER = Bedrock_v786.CODEC.createHelper();
     public static final BedrockCodec CODEC = Bedrock_v786.CODEC
-        .toBuilder().helper(() -> HELPER).build();
-        
+            .toBuilder().helper(() -> HELPER).build();
+
     public static final int PROTOCOL_VERSION = CODEC.getProtocolVersion();
     private static final BedrockPong ADVERTISEMENT = new BedrockPong()
             .edition("MCPE")
@@ -104,12 +101,12 @@ public class ProxyPass {
         MINECRAFT_VERSION = CODEC.getMinecraftVersion();
 
         HELPER.setEncodingSettings(EncodingSettings.builder()
-            .maxListSize(Integer.MAX_VALUE)
-            .maxByteArraySize(Integer.MAX_VALUE)
-            .maxNetworkNBTSize(Integer.MAX_VALUE)
-            .maxItemNBTSize(Integer.MAX_VALUE)
-            .maxStringLength(Integer.MAX_VALUE)
-            .build());
+                .maxListSize(Integer.MAX_VALUE)
+                .maxByteArraySize(Integer.MAX_VALUE)
+                .maxNetworkNBTSize(Integer.MAX_VALUE)
+                .maxItemNBTSize(Integer.MAX_VALUE)
+                .maxStringLength(Integer.MAX_VALUE)
+                .build());
     }
 
     private final AtomicBoolean running = new AtomicBoolean(true);
@@ -212,6 +209,22 @@ public class ProxyPass {
                     @Override
                     protected void initSession(ProxyServerSession session) {
                         session.setPacketHandler(new UpstreamPacketHandler(session, ProxyPass.this, account));
+
+                        if (!configuration.getIpWhitelist().isEmpty()) {
+                            BedrockPeer peer = session.getPeer();
+
+                            if (!(peer.getSocketAddress() instanceof InetSocketAddress inetSocketAddress)) {
+                                throw new IllegalArgumentException("SocketAddress is not an InetSocketAddress");
+                            }
+
+                            String host = inetSocketAddress.getHostString();
+
+                            if (!configuration.getIpWhitelist().contains(host)) {
+                                log.warn("Connection from {} denied due to IP whitelist", host);
+
+                                peer.close("Connection denied due to IP whitelist");
+                            }
+                        }
                     }
                 })
                 .bind(this.proxyAddress)
@@ -277,7 +290,7 @@ public class ProxyPass {
             }
         }
     }
-    
+
     public void saveCompressedNBT(String dataName, Object dataTag) {
         Path path = dataDir.resolve(dataName + ".nbt");
         try (OutputStream outputStream = Files.newOutputStream(path, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
@@ -301,7 +314,7 @@ public class ProxyPass {
     public Object loadNBT(String dataName) {
         Path path = dataDir.resolve(dataName + ".dat");
         try (InputStream inputStream = Files.newInputStream(path);
-            NBTInputStream nbtInputStream = NbtUtils.createNetworkReader(inputStream)) {
+             NBTInputStream nbtInputStream = NbtUtils.createNetworkReader(inputStream)) {
             return nbtInputStream.readTag();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -311,7 +324,7 @@ public class ProxyPass {
     public Object loadGzipNBT(String dataName) {
         Path path = dataDir.resolve(dataName);
         try (InputStream inputStream = Files.newInputStream(path);
-            NBTInputStream nbtInputStream = NbtUtils.createGZIPReader(inputStream)) {
+             NBTInputStream nbtInputStream = NbtUtils.createGZIPReader(inputStream)) {
             return nbtInputStream.readTag();
         } catch (IOException e) {
             return null;

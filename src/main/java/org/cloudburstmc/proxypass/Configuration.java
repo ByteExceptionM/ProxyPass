@@ -33,6 +33,8 @@ public class Configuration {
     private boolean loggingPackets = false;
     @JsonProperty("max-clients")
     private int maxClients = 0;
+    @JsonProperty("ip-whitelist")
+    private Set<String> ipWhitelist = Collections.emptySet();
     @JsonProperty("log-to")
     private LogTo logTo = LogTo.FILE;
 
